@@ -3,7 +3,7 @@ import requests
 import pandas as pd
 from tabulate import tabulate
 
-def only_att(sessionid):
+def only_att(sessionid, username, password):
     url = "https://erp.rajalakshmi.org/StudeHome.aspx/ShowAttendance"
     headers = {
         "Content-Type": "application/json; charset=UTF-8",
@@ -35,10 +35,10 @@ def only_att(sessionid):
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err}")
     except Exception as err:
-        print(f"An error occurred: {err}")
+        only_att(cookie_dump(username, password))
 
 
-def periods(sub_num, sessionid):
+def periods(sub_num, sessionid, username, password):
     from bs4 import BeautifulSoup
     subjects = ['counselling', 'os', 'sc', 'uid', 'softskills', 'dt', 'library', 'pss', 'nptel']
 
@@ -66,30 +66,88 @@ def periods(sub_num, sessionid):
         "ASP.NET_SessionId": sessionid
         }
     
-    session = requests.Session()
-    session.cookies.update(my_cookies)
-    response = requests.post(url, headers=headers, data=options.get(subjects[sub_num - 1]), cookies=my_cookies)
+    try:
+        session = requests.Session()
+        session.cookies.update(my_cookies)
+        response = requests.post(url, headers=headers, data=options.get(subjects[sub_num - 1]), cookies=my_cookies)
 
-    soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(response.text, "html.parser")
 
-    class_elements = soup.select('.table-responsive')
-    if class_elements:
-        table = class_elements[-1]
-        rows = table.find_all('tr')
-        parsed_data = []
-        for row in rows[1:]:
-            columns = row.find_all('td')
-            column_texts = [col.get_text(strip=True) for col in columns]
-            parsed_data.append(column_texts)
+        class_elements = soup.select('.table-responsive')
+        if class_elements:
+            table = class_elements[-1]
+            rows = table.find_all('tr')
+            parsed_data = []
+            for row in rows[1:]:
+                columns = row.find_all('td')
+                column_texts = [col.get_text(strip=True) for col in columns]
+                parsed_data.append(column_texts)
 
-    df_html = pd.DataFrame(parsed_data, columns=["Period No", "Date", "Slot Time", "Present/Absent"])
+        df_html = pd.DataFrame(parsed_data, columns=["Period No", "Date", "Slot Time", "Present/Absent"])
 
-    print(tabulate(df_html, headers='keys', tablefmt='grid', showindex=False))
+        print(tabulate(df_html, headers='keys', tablefmt='grid', showindex=False))
+    except UnboundLocalError:
+        periods(sub_num, cookie_dump(username, password))
+
+def cookie_dump(USERNAME, PASSWORD):
+    from selenium import webdriver
+    from pathlib import Path
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from dotenv import load_dotenv
+    import time
+    from dotenv import set_key
+
+    script_directory = Path(__file__).resolve().parent
+    load_dotenv()
+
+    driver_path = script_directory / "chromedriver-win64" / "chromedriver.exe"
+
+    service = Service(driver_path)
+
+    debugging = False
+    chrome_options = Options()
+
+    if debugging:
+        chrome_options.add_experimental_option("detach", True)
+    else:
+        chrome_options.add_argument("--headless")
+
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver.get("https://erp.rajalakshmi.org/")
+
+    username_input = driver.find_element(By.ID, "txt_username")
+    password_input = driver.find_element(By.ID, "txt_password")
+    captcha_element = driver.find_element(By.ID, "txtcaptcha")
+    data_captcha_value = captcha_element.get_attribute("data-captcha")
+    login_button = driver.find_element(By.ID, "btnLogin")
+
+    if username_input:
+        username_input.send_keys(USERNAME)
+    if password_input:
+        password_input.send_keys(PASSWORD)
+    if captcha_element:
+        captcha_element.send_keys(data_captcha_value)
+    if login_button:
+        login_button.click()
+
+    time.sleep(5)
+
+    for cookie in driver.get_cookies():
+        if cookie["name"] == "ASP.NET_SessionId":
+            set_key('.env', "sessionid", cookie['value'])
+            return cookie['value']
+
+    return None
+
+
+
 
 
 def enter_to_exit():
     print("Invalid option.")
-    a = input("Press Enter to exit.")
+    input("Press Enter to exit.")
 
 
 def check_if_int(choice):
