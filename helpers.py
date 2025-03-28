@@ -35,7 +35,7 @@ def only_att(sessionid, username, password):
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err}")
     except Exception as err:
-        only_att(cookie_dump(username, password))
+        only_att(cookie_dump(username, password), username, password)
 
 
 def periods(sub_num, sessionid, username, password):
