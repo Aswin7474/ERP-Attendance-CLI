@@ -7,8 +7,8 @@ This script automatically pulls attendance info from REC's ERP API without havin
 
 ### 1. Clone the Repository
 ```sh
-git clone https://github.com/yourusername/attendance-fetcher-cli.git
-cd attendance-fetcher-cli
+git clone https://github.com/yourusername/rec-erp-api.git
+cd rec-erp-api
 ```
 
 ### 2. Install Dependencies
