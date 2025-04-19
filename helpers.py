@@ -100,13 +100,12 @@ def cookie_dump(USERNAME, PASSWORD):
     from dotenv import set_key
 
     script_directory = Path(__file__).resolve().parent
-    load_dotenv()
 
     driver_path = script_directory / "chromedriver-win64" / "chromedriver.exe"
 
     service = Service(driver_path)
 
-    debugging = False
+    debugging = True
     chrome_options = Options()
 
     if debugging:
@@ -116,27 +115,62 @@ def cookie_dump(USERNAME, PASSWORD):
 
     driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.get("https://erp.rajalakshmi.org/")
+    
+
+    override_js = """
+        ValidateRequest = function () {
+            var Request_D = $("#hdncaptcha").val();
+
+            // 👇 Your injected line to see the 4-digit code before it's sent
+            console.log("Original captcha before POST:", Request_D);
+
+            $.ajax({
+                type: "POST",
+                url : path + '/WebServices/ADMINISTRATION/DefaultPage_Config.asmx/ValidateString',     
+                data: JSON.stringify({ Request: Request_D }),
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function (response) {
+                    window._originalCaptcha = $("#hdncaptcha").val();
+                    $("#hdncaptcha").val(JSON.parse(response.d))
+                    console.log("Encoded captcha returned:", response.d);
+                },
+                error: function (response) {
+                    $("[id*=preloader]").hide();
+                }
+            });
+        };
+        """
+    
+    driver.execute_script(override_js)
+    refresh_button = driver.find_element(By.XPATH, "//img[@alt='captcha']")
+    refresh_button.click()
+
+    captcha_element = driver.find_element(By.ID, "hdncaptcha")
+    # captcha_value = driver.execute_script("return window._originalCaptcha;")    
 
     username_input = driver.find_element(By.ID, "txt_username")
     password_input = driver.find_element(By.ID, "txt_password")
-    captcha_element = driver.find_element(By.ID, "txtcaptcha")
-    data_captcha_value = captcha_element.get_attribute("data-captcha")
+    data_captcha_value = captcha_element.get_attribute("value")
     login_button = driver.find_element(By.ID, "btnLogin")
+    captcha_input = driver.find_element(By.ID, "txtcaptcha")
 
     if username_input:
         username_input.send_keys(USERNAME)
     if password_input:
         password_input.send_keys(PASSWORD)
     if captcha_element:
-        captcha_element.send_keys(data_captcha_value)
+        captcha_input.send_keys(data_captcha_value)
+
     if login_button:
         login_button.click()
 
-    time.sleep(5)
+    time.sleep(3)
 
     for cookie in driver.get_cookies():
         if cookie["name"] == "ASP.NET_SessionId":
             set_key('.env', "sessionid", cookie['value'])
+            print(cookie["value"])
             return cookie['value']
 
     return None
