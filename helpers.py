@@ -83,6 +83,11 @@ def periods(sub_num, sessionid, username, password):
                 column_texts = [col.get_text(strip=True) for col in columns]
                 parsed_data.append(column_texts)
 
+        # print(parsed_data)
+        # for array in parsed_data:
+        #     print(array)
+        # quit()
+
         df_html = pd.DataFrame(parsed_data, columns=["Period No", "Date", "Slot Time", "Present/Absent"])
 
         print(tabulate(df_html, headers='keys', tablefmt='grid', showindex=False))
@@ -105,7 +110,7 @@ def cookie_dump(USERNAME, PASSWORD):
 
     service = Service(driver_path)
 
-    debugging = True
+    debugging = False
     chrome_options = Options()
 
     if debugging:
@@ -119,48 +124,52 @@ def cookie_dump(USERNAME, PASSWORD):
 
     override_js = """
         ValidateRequest = function () {
-            var Request_D = $("#hdncaptcha").val();
-
-            // 👇 Your injected line to see the 4-digit code before it's sent
-            console.log("Original captcha before POST:", Request_D);
-
-            $.ajax({
-                type: "POST",
-                url : path + '/WebServices/ADMINISTRATION/DefaultPage_Config.asmx/ValidateString',     
-                data: JSON.stringify({ Request: Request_D }),
-                contentType: "application/json; charset=utf-8",
-                dataType: "json",
-                success: function (response) {
-                    window._originalCaptcha = $("#hdncaptcha").val();
-                    $("#hdncaptcha").val(JSON.parse(response.d))
-                    console.log("Encoded captcha returned:", response.d);
-                },
-                error: function (response) {
-                    $("[id*=preloader]").hide();
-                }
-            });
-        };
+        var Request_D = $("#hdncaptcha").val();
+    
+        $.ajax({
+            type: "POST",
+            url : path + '/WebServices/ADMINISTRATION/DefaultPage_Config.asmx/ValidateString',     
+            data: JSON.stringify({ Request: Request_D }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+        // beforeSend: function () { $("[id*=preloader]").show(); },
+            success: function (response) {
+                console.log(response.d)
+                $("#txtcaptcha").val(JSON.parse(Request_D))
+                $("#hdncaptcha").val(JSON.parse(response.d))
+            },
+            failure: function (response) {
+            },
+            error: function (response) {
+                $("[id*=preloader]").hide();
+            }
+        });
+    };
         """
     
     driver.execute_script(override_js)
     refresh_button = driver.find_element(By.XPATH, "//img[@alt='captcha']")
     refresh_button.click()
 
-    captcha_element = driver.find_element(By.ID, "hdncaptcha")
+    # captcha_element = driver.find_element(By.ID, "hdncaptcha")
     # captcha_value = driver.execute_script("return window._originalCaptcha;")    
 
     username_input = driver.find_element(By.ID, "txt_username")
     password_input = driver.find_element(By.ID, "txt_password")
-    data_captcha_value = captcha_element.get_attribute("value")
+    # data_captcha_value = captcha_element.get_attribute("value")
     login_button = driver.find_element(By.ID, "btnLogin")
-    captcha_input = driver.find_element(By.ID, "txtcaptcha")
+    # captcha_input = driver.find_element(By.ID, "txtcaptcha")
+
+    # print(f'data_captcha value: {data_captcha_value}')
+    # print(f'captcha value {captcha_value}')
+
 
     if username_input:
         username_input.send_keys(USERNAME)
     if password_input:
         password_input.send_keys(PASSWORD)
-    if captcha_element:
-        captcha_input.send_keys(data_captcha_value)
+    # if captcha_element:
+        # captcha_input.send_keys(captcha_value)
 
     if login_button:
         login_button.click()
